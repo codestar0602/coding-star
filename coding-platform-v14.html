@@ -284,13 +284,14 @@
   }
 
   .terminal-area {
-    flex: 1; min-height: 120px; background: #0A0E1A;
+    height: 160px; background: #0A0E1A;
     border-top: 2px solid var(--sky);
     display: flex; flex-direction: column;
   }
   .terminal-tabs {
-    display: flex; border-bottom: 1px solid var(--border);
-    background: var(--dark2);
+    display: flex; align-items: center;
+    border-bottom: 1px solid var(--border);
+    background: var(--dark2); flex-shrink: 0;
   }
   .terminal-tab {
     padding: 8px 16px; font-size: 12px; cursor: pointer;
@@ -717,6 +718,13 @@ print(result4)  # 결과: False</textarea>
           <div class="terminal-tabs">
             <div class="terminal-tab active" onclick="switchTerminal('terminal',this)">터미널</div>
             <div class="terminal-tab" onclick="switchTerminal('result',this)">제출 결과</div>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:6px;padding:0 10px">
+              <span id="submit-count-badge" style="font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(79,195,247,.15);color:var(--sky);font-weight:700">제출 가능 3회</span>
+              <button class="btn btn-ghost btn-sm" onclick="showHint()" style="padding:3px 10px;font-size:12px">💡 힌트</button>
+              <button class="btn btn-ghost btn-sm" onclick="showModelAnswer()" id="answer-btn" style="color:var(--sun);border-color:var(--sun);padding:3px 10px;font-size:12px">📖 정답 보기</button>
+              <button class="btn btn-sun btn-sm" onclick="runCode()" style="padding:3px 12px;font-size:12px">▶ 실행</button>
+              <button class="btn btn-coral btn-sm" onclick="submitCode()" id="submit-btn" style="padding:3px 12px;font-size:12px">🚀 제출</button>
+            </div>
           </div>
           <div class="terminal-body" id="terminal-body">
             <div class="info">터미널 연결됨</div>
@@ -728,19 +736,7 @@ print(result4)  # 결과: False</textarea>
           </div>
         </div>
 
-        <!-- Footer -->
-        <div class="editor-footer">
-          <div style="display:flex;align-items:center;gap:10px">
-            <span style="font-size:12px;color:var(--muted)">Python 3.11</span>
-            <span id="submit-count-badge" style="font-size:12px;padding:3px 10px;border-radius:20px;background:rgba(79,195,247,.15);color:var(--sky);font-weight:700">제출 가능 3회</span>
-          </div>
-          <div style="display:flex;gap:10px">
-            <button class="btn btn-ghost btn-sm" onclick="showHint()">💡 힌트</button>
-            <button class="btn btn-ghost btn-sm" onclick="showModelAnswer()" id="answer-btn" style="color:var(--sun);border-color:var(--sun)">📖 정답 보기</button>
-            <button class="btn btn-sun btn-sm" onclick="runCode()">▶ 실행</button>
-            <button class="btn btn-coral btn-sm" onclick="submitCode()" id="submit-btn">🚀 제출</button>
-          </div>
-        </div>
+        <!-- Footer 제거 (버튼을 터미널 탭으로 이동) -->
       </div>
     </div>
   </div>
@@ -4625,56 +4621,109 @@ print(result4)`;
   }
 
   // ══ Syntax Highlighter ══
-  function escapeHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
   function highlightPython(code) {
-    const keywords = /\b(if|elif|else|for|while|def|class|return|import|from|as|in|not|and|or|True|False|None|break|continue|pass|lambda|try|except|finally|raise|with|yield|global|nonlocal|del|assert)\b/g;
-    const builtins = /\b(print|input|len|range|int|float|str|list|dict|set|tuple|bool|type|abs|max|min|sum|sorted|reversed|enumerate|zip|map|filter|open|round|format|append|extend|pop|remove|split|join|strip|upper|lower|replace|find|index)\b/g;
-    const blanks   = /(_____+|\?{2,3})/g;
+    const KEYWORDS = new Set(['if','elif','else','for','while','def','class','return',
+      'import','from','as','in','not','and','or','True','False','None','break',
+      'continue','pass','lambda','try','except','finally','raise','with','yield',
+      'global','nonlocal','del','assert']);
+    const BUILTINS = new Set(['print','input','len','range','int','float','str','list',
+      'dict','set','tuple','bool','type','abs','max','min','sum','sorted','reversed',
+      'enumerate','zip','map','filter','open','round','format']);
 
-    const lines = code.split('\n');
-    return lines.map(line => {
-      // 주석 처리 (# 이후 전체)
-      const commentIdx = line.indexOf('#');
-      let codePart = commentIdx >= 0 ? line.slice(0, commentIdx) : line;
-      const commentPart = commentIdx >= 0 ? line.slice(commentIdx) : '';
+    function esc(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
 
-      // 문자열 토큰 보호 (치환 후 복원)
-      const strTokens = [];
-      codePart = codePart.replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, (m) => {
-        strTokens.push(`<span class="tok-string">${escapeHtml(m)}</span>`);
-        return `\x00STR${strTokens.length-1}\x00`;
-      });
+    // 한 줄을 토큰 단위로 파싱해서 색칠
+    function tokenizeLine(line) {
+      let result = '';
+      let i = 0;
+      while (i < line.length) {
+        // 문자열 "..." 또는 '...'
+        if (line[i] === '"' || line[i] === "'") {
+          const q = line[i];
+          let j = i + 1;
+          while (j < line.length && line[j] !== q) {
+            if (line[j] === '\\') j++;
+            j++;
+          }
+          j++;
+          result += `<span class="tok-string">${esc(line.slice(i, j))}</span>`;
+          i = j;
+          continue;
+        }
+        // 숫자
+        if (/\d/.test(line[i]) && (i === 0 || /\W/.test(line[i-1]))) {
+          let j = i;
+          while (j < line.length && /[\d.]/.test(line[j])) j++;
+          result += `<span class="tok-number">${esc(line.slice(i, j))}</span>`;
+          i = j;
+          continue;
+        }
+        // 식별자(키워드/내장함수/일반)
+        if (/[a-zA-Z_]/.test(line[i])) {
+          let j = i;
+          while (j < line.length && /\w/.test(line[j])) j++;
+          const word = line.slice(i, j);
+          if (KEYWORDS.has(word)) {
+            result += `<span class="tok-keyword">${esc(word)}</span>`;
+          } else if (BUILTINS.has(word)) {
+            result += `<span class="tok-builtin">${esc(word)}</span>`;
+          } else {
+            result += esc(word);
+          }
+          i = j;
+          continue;
+        }
+        // 빈칸 _____ or ???
+        if (line[i] === '_' && line.slice(i).match(/^_____+/)) {
+          const m = line.slice(i).match(/^_+/)[0];
+          result += `<span class="tok-blank">${m}</span>`;
+          i += m.length;
+          continue;
+        }
+        if (line[i] === '?' && line.slice(i).match(/^\?{2,3}/)) {
+          const m = line.slice(i).match(/^\?+/)[0];
+          result += `<span class="tok-blank">${m}</span>`;
+          i += m.length;
+          continue;
+        }
+        // 연산자
+        const ops2 = ['==','!=','<=','>=','+=','-=','*=','/=','//','**'];
+        const op2 = line.slice(i, i+2);
+        if (ops2.includes(op2)) {
+          result += `<span class="tok-operator">${esc(op2)}</span>`;
+          i += 2;
+          continue;
+        }
+        if ('=+-*/%<>'.includes(line[i])) {
+          result += `<span class="tok-operator">${esc(line[i])}</span>`;
+          i++;
+          continue;
+        }
+        // 그 외
+        result += esc(line[i]);
+        i++;
+      }
+      return result;
+    }
 
-      // 빈칸 강조
-      codePart = escapeHtml(codePart);
-      codePart = codePart.replace(/(_____+|\?{2,3})/g, '<span class="tok-blank">$1</span>');
-
-      // 숫자
-      codePart = codePart.replace(/\b(\d+\.?\d*)\b/g, '<span class="tok-number">$1</span>');
-
-      // 키워드
-      codePart = codePart.replace(keywords, '<span class="tok-keyword">$1</span>');
-
-      // 내장 함수
-      codePart = codePart.replace(builtins, '<span class="tok-builtin">$1</span>');
-
-      // 연산자
-      codePart = codePart.replace(/(==|!=|&lt;=|&gt;=|&lt;|&gt;|\+=|-=|\*=|\/=|=|\+|-|\*|\/|%)/g,
-        '<span class="tok-operator">$1</span>');
-
-      // 문자열 복원
-      strTokens.forEach((tok, i) => {
-        codePart = codePart.replace(`\x00STR${i}\x00`, tok);
-      });
-
-      const commentHtml = commentPart
-        ? `<span class="tok-comment">${escapeHtml(commentPart)}</span>`
-        : '';
-
-      return codePart + commentHtml;
+    return code.split('\n').map(line => {
+      // 주석 분리
+      let codePart = line, commentPart = '';
+      // 문자열 밖의 # 찾기
+      let inStr = null;
+      for (let i = 0; i < line.length; i++) {
+        if (!inStr && (line[i] === '"' || line[i] === "'")) { inStr = line[i]; }
+        else if (inStr && line[i] === inStr && line[i-1] !== '\\') { inStr = null; }
+        else if (!inStr && line[i] === '#') {
+          codePart = line.slice(0, i);
+          commentPart = line.slice(i);
+          break;
+        }
+      }
+      return tokenizeLine(codePart) +
+        (commentPart ? `<span class="tok-comment">${esc(commentPart)}</span>` : '');
     }).join('\n');
   }
 
@@ -4690,12 +4739,11 @@ print(result4)`;
   function initHighlighter() {
     const ta = document.getElementById('code-editor');
     if (!ta) return;
-    ta.addEventListener('input',  updateHighlight);
+    ta.addEventListener('input', updateHighlight);
     ta.addEventListener('scroll', () => {
       const pre = document.getElementById('code-highlight-pre');
       if (pre) { pre.scrollTop = ta.scrollTop; pre.scrollLeft = ta.scrollLeft; }
     });
-    ta.addEventListener('keyup', updateHighlight);
     updateHighlight();
   }
 
