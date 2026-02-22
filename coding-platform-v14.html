@@ -223,24 +223,50 @@
 
   .editor-toolbar {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 8px 16px; background: var(--dark2);
+    padding: 5px 16px; background: var(--dark2);
     border-bottom: 1px solid var(--border);
   }
   .toolbar-left { display: flex; gap: 8px; }
   .toolbar-right { display: flex; gap: 8px; }
 
+  /* Syntax Highlighting Editor */
   .code-area {
     flex: 1; position: relative; overflow: hidden;
     background: #0D1117;
   }
+  .code-highlight-wrap {
+    position: relative; width: 100%; height: 100%;
+  }
+  .code-highlight-pre {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    margin: 0; padding: 6px 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px; line-height: 1.6;
+    white-space: pre-wrap; word-wrap: break-word;
+    color: transparent; pointer-events: none;
+    box-sizing: border-box; overflow: hidden;
+    tab-size: 4; border: none; background: transparent;
+  }
   .code-editor {
+    position: absolute; top: 0; left: 0;
     width: 100%; height: 100%;
     background: transparent; border: none; outline: none;
     color: #E6EDF3; font-family: 'Courier New', monospace;
-    font-size: 14px; line-height: 1.7;
-    padding: 20px; resize: none;
-    tab-size: 4;
+    font-size: 14px; line-height: 1.6;
+    padding: 6px 16px; resize: none;
+    tab-size: 4; box-sizing: border-box;
+    caret-color: #E6EDF3; z-index: 2;
+    white-space: pre-wrap; word-wrap: break-word;
   }
+  /* Python syntax colors */
+  .tok-keyword  { color: #FF7B72; }  /* if for while def class return import ... */
+  .tok-builtin  { color: #79C0FF; }  /* print input len range int str ... */
+  .tok-string   { color: #A5D6FF; }  /* "문자열" '문자열' */
+  .tok-number   { color: #F2CC60; }  /* 숫자 */
+  .tok-comment  { color: #6A9955; font-style: italic; } /* # 주석 */
+  .tok-operator { color: #FF9D00; }  /* = + - * / % == != < > */
+  .tok-blank    { color: #FF6B6B; text-decoration: underline; } /* _____ ??? */
 
   /* Block area */
   .block-area {
@@ -256,7 +282,7 @@
   }
 
   .terminal-area {
-    height: 180px; background: #0A0E1A;
+    height: 110px; background: #0A0E1A;
     border-top: 1px solid var(--border);
     display: flex; flex-direction: column;
   }
@@ -277,6 +303,14 @@
   .terminal-body .err { color: var(--coral); }
   .terminal-body .info { color: var(--muted); }
   .terminal-body .out { color: #E6EDF3; }
+  .terminal-input-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 6px;
+  }
+  .terminal-input-row input {
+    background: transparent; border: none; border-bottom: 1px solid var(--sky);
+    color: var(--sky); font-family: monospace; font-size: 13px;
+    outline: none; flex: 1; padding: 2px 4px;
+  }
 
   .editor-footer {
     display: flex; align-items: center; justify-content: space-between;
@@ -635,7 +669,9 @@
 
         <!-- Code Editor -->
         <div class="code-area" id="code-area">
-          <textarea class="code-editor" id="code-editor" spellcheck="false"># 3은 3과 같다 '그리고' 2는 1보다 크다
+          <div class="code-highlight-wrap" id="code-highlight-wrap">
+            <pre class="code-highlight-pre" id="code-highlight-pre" aria-hidden="true"></pre>
+            <textarea class="code-editor" id="code-editor" spellcheck="false"># 3은 3과 같다 '그리고' 2는 1보다 크다
 print(3 == 3 ??? 2 > 1)  # 결과: True
 
 # 5는 10보다 크다 '또는' 7은 7과 같다
@@ -653,6 +689,7 @@ print(result3)  # 결과: True
 condition4 = True
 result4 = ??? condition4
 print(result4)  # 결과: False</textarea>
+          </div>
         </div>
 
         <!-- Block Area (iframe would embed Entry/Scratch) -->
@@ -2453,7 +2490,7 @@ print(result4)  # 결과: False</textarea>
       </div>`;
     // Update editor
     const editor = document.getElementById('code-editor');
-    if(editor) editor.value = p.starter || '# 코드를 작성하세요';
+    if(editor) { editor.value = p.starter || '# 코드를 작성하세요'; updateHighlight(); }
     // Reset submit count badge
     updateSubmitBadge();
     // Reset terminal
@@ -2510,10 +2547,8 @@ condition4 = True
 result4 = ??? condition4
 print(result4)`;
     showToast('코드가 초기화되었어요!');
+    updateHighlight();
   }
-
-  // ══════════════════════════════════════════════════════
-  //  제출 횟수 관리 & 오답노트 시스템
   // ══════════════════════════════════════════════════════
 
   // submitCounts["ci-pi"] = 제출 횟수 (최대 3)
@@ -2649,11 +2684,28 @@ print(result4)`;
   }
 
   // ── 실행 ──
+  // input() 개수 파악
+  function countInputCalls(code) {
+    const matches = code.match(/input\s*\(/g);
+    return matches ? matches.length : 0;
+  }
+
+  // input() 프롬프트 텍스트 추출
+  function getInputPrompts(code) {
+    const prompts = [];
+    const regex = /input\s*\(\s*["']([^"']*)["']\s*\)/g;
+    let m;
+    while ((m = regex.exec(code)) !== null) prompts.push(m[1]);
+    // 프롬프트 없는 input()도 포함
+    const total = countInputCalls(code);
+    while (prompts.length < total) prompts.push('');
+    return prompts;
+  }
+
   function runCode() {
     const terminal = document.getElementById('terminal-body');
     const code = document.getElementById('code-editor').value;
 
-    // 실행 횟수 증가
     incRunCount();
 
     // 터미널 탭으로 전환
@@ -2662,47 +2714,101 @@ print(result4)`;
     const rb = document.getElementById('result-body');
     if (rb) rb.style.display = 'none';
 
-    terminal.innerHTML = `<div class="info">▶ 실행 중... ⚡</div>`;
-
-    setTimeout(() => {
-      if (code.includes('_____') || code.includes('???') || code.includes('______')) {
-        terminal.innerHTML = `
-          <div class="info">user@coding-star:~$ python3 main.py</div>
-          <div class="err">SyntaxError: invalid syntax</div>
-          <div class="info">💡 빈칸(_____)을 채워야 실행할 수 있어요!</div>`;
-        return;
-      }
-      const correct = checkAnswer(code);
-      const ch = CHAPTERS[currentChapter];
-      const p = ch ? ch.problems[currentProblem] : null;
-      const expectedOut = p ? p.ex_out : '';
+    // 빈칸 체크
+    if (code.includes('_____') || code.includes('???') || code.includes('______')) {
       terminal.innerHTML = `
         <div class="info">user@coding-star:~$ python3 main.py</div>
-        ${correct
-          ? `<div class="out">${expectedOut.replace(/\n/g, '</div><div class="out">')}</div>
-             <div class="ok">✅ 실행 완료 (0.04초)</div>`
-          : `<div class="err">실행 결과가 예상 출력과 다릅니다.</div>
-             <div class="info">💡 ${getHintText()}</div>`
-        }`;
+        <div class="err">SyntaxError: invalid syntax</div>
+        <div class="info">💡 빈칸(_____)을 채워야 실행할 수 있어요!</div>`;
+      return;
+    }
 
-      // 실행에서 정답이면 폭죽!
-      if (correct) launchConfetti();
+    const inputCount = countInputCalls(code);
 
-      // 정답 보기 버튼 업데이트
-      const runCnt = getRunCount();
-      const ansBtn = document.getElementById('answer-btn');
-      if (ansBtn) {
-        if (runCnt >= 3) {
-          ansBtn.textContent = '📖 정답 보기';
-          ansBtn.style.opacity = '1';
-          ansBtn.title = '정답을 확인할 수 있어요!';
-        } else {
-          ansBtn.textContent = `📖 정답 보기 (${runCnt}/3)`;
-          ansBtn.style.opacity = '0.6';
-          ansBtn.title = `정답 보기는 ${3 - runCnt}번 더 실행 후 가능해요`;
+    if (inputCount > 0) {
+      // input()이 있으면 → 터미널에 입력창 순서대로 표시
+      const prompts = getInputPrompts(code);
+      const userInputs = [];
+      terminal.innerHTML = `<div class="info">user@coding-star:~$ python3 main.py</div>`;
+
+      function askNext(idx) {
+        if (idx >= inputCount) {
+          // 모든 입력 완료 → 실행 결과 표시
+          executeWithInputs(code, userInputs, terminal);
+          return;
         }
+        const promptText = prompts[idx] || '입력: ';
+        const rowId = 'input-row-' + idx;
+        terminal.innerHTML += `
+          <div class="terminal-input-row" id="${rowId}">
+            <span class="info">${promptText}</span>
+            <input type="text" id="terminal-input-${idx}" placeholder="값을 입력하고 Enter" autofocus />
+          </div>`;
+        terminal.scrollTop = terminal.scrollHeight;
+        const inputEl = document.getElementById('terminal-input-' + idx);
+        inputEl.focus();
+        inputEl.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') {
+            const val = inputEl.value;
+            userInputs.push(val);
+            // 입력창을 텍스트로 교체
+            document.getElementById(rowId).outerHTML =
+              `<div><span class="info">${promptText}</span><span class="out">${val}</span></div>`;
+            askNext(idx + 1);
+          }
+        });
       }
-    }, 700);
+      askNext(0);
+
+    } else {
+      // input() 없음 → 기존 방식
+      terminal.innerHTML = `<div class="info">▶ 실행 중... ⚡</div>`;
+      setTimeout(() => {
+        executeWithInputs(code, [], terminal);
+      }, 400);
+    }
+  }
+
+  function executeWithInputs(code, inputs, terminal) {
+    const ch = CHAPTERS[currentChapter];
+    const p = ch ? ch.problems[currentProblem] : null;
+    const expectedOut = p ? p.ex_out : '';
+    const expectedIn  = p ? (p.ex_in || '') : '';
+
+    // 입력값이 문제 예시와 맞는지 확인 (공백 무시)
+    const inputJoined = inputs.join('\n').trim();
+    const expectedInTrim = expectedIn.trim();
+    const inputsMatch = !expectedInTrim || inputJoined === expectedInTrim ||
+                        inputs.join(' ').trim() === expectedInTrim;
+
+    const correct = checkAnswer(code) && (inputsMatch || inputs.length === 0);
+
+    // 입력값 표시 후 결과 표시
+    const existingContent = terminal.innerHTML;
+    terminal.innerHTML = existingContent +
+      `<div class="info">user@coding-star:~$ python3 main.py</div>` +
+      (inputs.length > 0 ? '' : '') +
+      (correct
+        ? `<div class="out">${expectedOut.replace(/\n/g, '</div><div class="out">')}</div>
+           <div class="ok">✅ 실행 완료</div>`
+        : `<div class="err">실행 결과가 예상 출력과 다릅니다.</div>
+           <div class="info">💡 ${getHintText()}</div>`
+      );
+    terminal.scrollTop = terminal.scrollHeight;
+
+    if (correct) launchConfetti();
+
+    const runCnt = getRunCount();
+    const ansBtn = document.getElementById('answer-btn');
+    if (ansBtn) {
+      if (runCnt >= 3) {
+        ansBtn.textContent = '📖 정답 보기';
+        ansBtn.style.opacity = '1';
+      } else {
+        ansBtn.textContent = `📖 정답 보기 (${runCnt}/3)`;
+        ansBtn.style.opacity = '0.6';
+      }
+    }
   }
 
   // ── 힌트 ──
@@ -4516,12 +4622,87 @@ print(result4)`;
     panel.style.display = 'block';
   }
 
+  // ══ Syntax Highlighter ══
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function highlightPython(code) {
+    const keywords = /\b(if|elif|else|for|while|def|class|return|import|from|as|in|not|and|or|True|False|None|break|continue|pass|lambda|try|except|finally|raise|with|yield|global|nonlocal|del|assert)\b/g;
+    const builtins = /\b(print|input|len|range|int|float|str|list|dict|set|tuple|bool|type|abs|max|min|sum|sorted|reversed|enumerate|zip|map|filter|open|round|format|append|extend|pop|remove|split|join|strip|upper|lower|replace|find|index)\b/g;
+    const blanks   = /(_____+|\?{2,3})/g;
+
+    const lines = code.split('\n');
+    return lines.map(line => {
+      // 주석 처리 (# 이후 전체)
+      const commentIdx = line.indexOf('#');
+      let codePart = commentIdx >= 0 ? line.slice(0, commentIdx) : line;
+      const commentPart = commentIdx >= 0 ? line.slice(commentIdx) : '';
+
+      // 문자열 토큰 보호 (치환 후 복원)
+      const strTokens = [];
+      codePart = codePart.replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, (m) => {
+        strTokens.push(`<span class="tok-string">${escapeHtml(m)}</span>`);
+        return `\x00STR${strTokens.length-1}\x00`;
+      });
+
+      // 빈칸 강조
+      codePart = escapeHtml(codePart);
+      codePart = codePart.replace(/(_____+|\?{2,3})/g, '<span class="tok-blank">$1</span>');
+
+      // 숫자
+      codePart = codePart.replace(/\b(\d+\.?\d*)\b/g, '<span class="tok-number">$1</span>');
+
+      // 키워드
+      codePart = codePart.replace(keywords, '<span class="tok-keyword">$1</span>');
+
+      // 내장 함수
+      codePart = codePart.replace(builtins, '<span class="tok-builtin">$1</span>');
+
+      // 연산자
+      codePart = codePart.replace(/(==|!=|&lt;=|&gt;=|&lt;|&gt;|\+=|-=|\*=|\/=|=|\+|-|\*|\/|%)/g,
+        '<span class="tok-operator">$1</span>');
+
+      // 문자열 복원
+      strTokens.forEach((tok, i) => {
+        codePart = codePart.replace(`\x00STR${i}\x00`, tok);
+      });
+
+      const commentHtml = commentPart
+        ? `<span class="tok-comment">${escapeHtml(commentPart)}</span>`
+        : '';
+
+      return codePart + commentHtml;
+    }).join('\n');
+  }
+
+  function updateHighlight() {
+    const ta  = document.getElementById('code-editor');
+    const pre = document.getElementById('code-highlight-pre');
+    if (!ta || !pre) return;
+    pre.innerHTML = highlightPython(ta.value) + '\n';
+    // 스크롤 동기화
+    pre.scrollTop  = ta.scrollTop;
+    pre.scrollLeft = ta.scrollLeft;
+  }
+
+  function initHighlighter() {
+    const ta = document.getElementById('code-editor');
+    if (!ta) return;
+    ta.style.color = 'transparent';
+    ta.addEventListener('input',  updateHighlight);
+    ta.addEventListener('scroll', updateHighlight);
+    ta.addEventListener('keyup',  updateHighlight);
+    updateHighlight();
+  }
+
   // Init — Supabase에서 데이터 로드 후 렌더링
   (async () => {
     await loadFromStorage();
     renderStudents();
     renderSidebar();
     if(CHAPTERS && CHAPTERS.length > 0) loadProblem(0, 0);
+    initHighlighter();
   })();
 </script>
 </body>
