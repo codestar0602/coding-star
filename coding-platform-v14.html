@@ -231,8 +231,8 @@
 
   /* Syntax Highlighting Editor */
   .code-area {
-    flex: 1; position: relative; overflow: hidden;
-    background: #0D1117;
+    height: 280px; position: relative; overflow: hidden;
+    background: #0D1117; flex-shrink: 0;
   }
   .code-highlight-wrap {
     position: relative; width: 100%; height: 100%;
@@ -244,15 +244,17 @@
     font-family: 'Courier New', monospace;
     font-size: 14px; line-height: 1.6;
     white-space: pre-wrap; word-wrap: break-word;
-    color: transparent; pointer-events: none;
-    box-sizing: border-box; overflow: hidden;
+    pointer-events: none;
+    box-sizing: border-box; overflow: auto;
     tab-size: 4; border: none; background: transparent;
+    z-index: 1;
   }
   .code-editor {
     position: absolute; top: 0; left: 0;
     width: 100%; height: 100%;
     background: transparent; border: none; outline: none;
-    color: #E6EDF3; font-family: 'Courier New', monospace;
+    color: transparent;
+    font-family: 'Courier New', monospace;
     font-size: 14px; line-height: 1.6;
     padding: 6px 16px; resize: none;
     tab-size: 4; box-sizing: border-box;
@@ -260,13 +262,13 @@
     white-space: pre-wrap; word-wrap: break-word;
   }
   /* Python syntax colors */
-  .tok-keyword  { color: #FF7B72; }  /* if for while def class return import ... */
-  .tok-builtin  { color: #79C0FF; }  /* print input len range int str ... */
-  .tok-string   { color: #A5D6FF; }  /* "문자열" '문자열' */
-  .tok-number   { color: #F2CC60; }  /* 숫자 */
-  .tok-comment  { color: #6A9955; font-style: italic; } /* # 주석 */
-  .tok-operator { color: #FF9D00; }  /* = + - * / % == != < > */
-  .tok-blank    { color: #FF6B6B; text-decoration: underline; } /* _____ ??? */
+  .tok-keyword  { color: #FF7B72; }
+  .tok-builtin  { color: #79C0FF; }
+  .tok-string   { color: #A5D6FF; }
+  .tok-number   { color: #F2CC60; }
+  .tok-comment  { color: #6A9955; font-style: italic; }
+  .tok-operator { color: #FF9D00; }
+  .tok-blank    { color: #FF6B6B; text-decoration: underline wavy; }
 
   /* Block area */
   .block-area {
@@ -282,8 +284,8 @@
   }
 
   .terminal-area {
-    height: 110px; background: #0A0E1A;
-    border-top: 1px solid var(--border);
+    flex: 1; min-height: 120px; background: #0A0E1A;
+    border-top: 2px solid var(--sky);
     display: flex; flex-direction: column;
   }
   .terminal-tabs {
@@ -4681,7 +4683,6 @@ print(result4)`;
     const pre = document.getElementById('code-highlight-pre');
     if (!ta || !pre) return;
     pre.innerHTML = highlightPython(ta.value) + '\n';
-    // 스크롤 동기화
     pre.scrollTop  = ta.scrollTop;
     pre.scrollLeft = ta.scrollLeft;
   }
@@ -4689,10 +4690,12 @@ print(result4)`;
   function initHighlighter() {
     const ta = document.getElementById('code-editor');
     if (!ta) return;
-    ta.style.color = 'transparent';
     ta.addEventListener('input',  updateHighlight);
-    ta.addEventListener('scroll', updateHighlight);
-    ta.addEventListener('keyup',  updateHighlight);
+    ta.addEventListener('scroll', () => {
+      const pre = document.getElementById('code-highlight-pre');
+      if (pre) { pre.scrollTop = ta.scrollTop; pre.scrollLeft = ta.scrollLeft; }
+    });
+    ta.addEventListener('keyup', updateHighlight);
     updateHighlight();
   }
 
