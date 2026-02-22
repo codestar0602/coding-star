@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>코딩별 - 초등 코딩 테스트 플랫폼</title>
 <link href="https://fonts.googleapis.com/css2?family=Jua&family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/blockly/blockly.min.js"></script>
 <style>
   :root {
     --sky: #4FC3F7;
@@ -274,10 +273,15 @@
   /* Block area */
   .block-area {
     flex: 1; display: none; flex-direction: column;
-    background: #0D1117; overflow: hidden;
+    background: #1A2535;
   }
   .block-area.show { display: flex; }
-  #blockly-div { flex: 1; min-height: 200px; }
+  .block-iframe { flex: 1; border: none; }
+  .block-note {
+    padding: 10px 16px; background: var(--dark2);
+    border-top: 1px solid var(--border);
+    font-size: 13px; color: var(--muted);
+  }
 
   .terminal-area {
     height: 160px; background: #0A0E1A;
@@ -659,11 +663,6 @@
               <option>main.py</option>
             </select>
           </div>
-          <div class="toolbar-right">
-            <button class="btn btn-ghost btn-sm" onclick="resetCode()">🔄 초기화</button>
-            <button class="btn btn-sun btn-sm" onclick="runCode()">▶ 실행</button>
-            <button class="btn btn-coral btn-sm" onclick="submitCode()">🚀 제출</button>
-          </div>
         </div>
 
         <!-- Code Editor -->
@@ -691,26 +690,22 @@ print(result4)  # 결과: False</textarea>
           </div>
         </div>
 
-        <!-- Block Area - Blockly 에디터 -->
+        <!-- Block Area (iframe would embed Entry/Scratch) -->
         <div class="block-area" id="block-area">
-          <div style="display:flex;flex-direction:column;height:100%">
-            <!-- Blockly 툴바 -->
-            <div style="display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--dark2);border-bottom:1px solid var(--border);flex-shrink:0">
-              <span style="font-size:13px;color:var(--sky);font-weight:700">🧩 블록 코딩</span>
-              <div style="margin-left:auto;display:flex;gap:6px">
-                <button class="btn btn-ghost btn-sm" onclick="clearBlockly()" style="font-size:12px">🗑 초기화</button>
-                <button class="btn btn-grass btn-sm" onclick="blocklyToPython()" style="font-size:12px;color:#fff">🔄 파이썬으로 변환</button>
-              </div>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;color:var(--muted)">
+            <div style="font-size:60px">🧩</div>
+            <div style="font-family:'Jua';font-size:20px;color:var(--text)">블록 코딩 환경</div>
+            <div style="font-size:14px;max-width:360px;text-align:center;line-height:1.7">
+              실제 서비스에서는 이 영역에<br>
+              <strong style="color:var(--sky)">엔트리(Entry)</strong> 또는 <strong style="color:var(--sun)">스크래치(Scratch)</strong><br>
+              임베드 에디터가 표시됩니다.
             </div>
-            <!-- Blockly 작업 영역 -->
-            <div id="blockly-div" style="flex:1;width:100%;"></div>
-            <!-- 변환된 파이썬 코드 미리보기 -->
-            <div id="blockly-python-preview" style="display:none;background:#0D1117;border-top:1px solid var(--border);padding:10px 14px;font-family:monospace;font-size:12px;color:#A5D6FF;max-height:120px;overflow-y:auto;">
-              <div style="color:var(--muted);font-size:11px;margin-bottom:4px">📋 변환된 파이썬 코드:</div>
-              <pre id="blockly-python-code" style="margin:0;white-space:pre-wrap;color:#E6EDF3"></pre>
-              <button class="btn btn-sky btn-sm" onclick="applyBlocklyCode()" style="margin-top:8px;font-size:12px">✅ 파이썬 에디터에 적용</button>
+            <div style="display:flex;gap:12px">
+              <button class="btn btn-sky btn-sm">🇰🇷 엔트리 열기</button>
+              <button class="btn btn-sun btn-sm" style="color:var(--dark)">🐱 스크래치 열기</button>
             </div>
           </div>
+          <div class="block-note">💡 블록으로 만든 코드는 자동으로 파이썬으로 변환됩니다</div>
         </div>
 
         <!-- Terminal -->
@@ -722,8 +717,6 @@ print(result4)  # 결과: False</textarea>
               <span id="submit-count-badge" style="font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(79,195,247,.15);color:var(--sky);font-weight:700">제출 가능 3회</span>
               <button class="btn btn-ghost btn-sm" onclick="showHint()" style="padding:3px 10px;font-size:12px">💡 힌트</button>
               <button class="btn btn-ghost btn-sm" onclick="showModelAnswer()" id="answer-btn" style="color:var(--sun);border-color:var(--sun);padding:3px 10px;font-size:12px">📖 정답 보기</button>
-              <button class="btn btn-sun btn-sm" onclick="runCode()" style="padding:3px 12px;font-size:12px">▶ 실행</button>
-              <button class="btn btn-coral btn-sm" onclick="submitCode()" id="submit-btn" style="padding:3px 12px;font-size:12px">🚀 제출</button>
             </div>
           </div>
           <div class="terminal-body" id="terminal-body">
@@ -736,7 +729,17 @@ print(result4)  # 결과: False</textarea>
           </div>
         </div>
 
-        <!-- Footer 제거 (버튼을 터미널 탭으로 이동) -->
+        <!-- Footer -->
+        <div class="editor-footer">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:12px;color:var(--muted)">Python 3.11</span>
+          </div>
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-ghost btn-sm" onclick="resetCode()">🔄 초기화</button>
+            <button class="btn btn-sun btn-sm" onclick="runCode()">▶ 실행</button>
+            <button class="btn btn-coral btn-sm" onclick="submitCode()" id="submit-btn">🚀 제출</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -4830,190 +4833,7 @@ print(result4)`;
     renderSidebar();
     if(CHAPTERS && CHAPTERS.length > 0) loadProblem(0, 0);
     initHighlighter();
-    initBlockly();
   })();
-
-  // ══ Blockly 블록 코딩 ══
-  let blocklyWorkspace = null;
-
-  const BLOCKLY_TOOLBOX = {
-    kind: 'categoryToolbox',
-    contents: [
-      {
-        kind: 'category', name: '📤 출력', colour: '#4FC3F7',
-        contents: [
-          { kind: 'block', type: 'text_print' },
-          { kind: 'block', type: 'text' },
-          { kind: 'block', type: 'text_join' },
-        ]
-      },
-      {
-        kind: 'category', name: '📥 입력', colour: '#66BB6A',
-        contents: [
-          { kind: 'block', type: 'text_prompt_ext',
-            inputs: { TEXT: { shadow: { type: 'text', fields: { TEXT: '입력하세요: ' } } } } },
-        ]
-      },
-      {
-        kind: 'category', name: '🔢 변수', colour: '#FFD54F',
-        contents: [
-          { kind: 'block', type: 'variables_get' },
-          { kind: 'block', type: 'variables_set' },
-          { kind: 'block', type: 'math_change' },
-        ],
-        custom: 'VARIABLE'
-      },
-      {
-        kind: 'category', name: '🔢 숫자', colour: '#FF9D00',
-        contents: [
-          { kind: 'block', type: 'math_number' },
-          { kind: 'block', type: 'math_arithmetic' },
-          { kind: 'block', type: 'math_single' },
-          { kind: 'block', type: 'math_modulo' },
-          { kind: 'block', type: 'math_round' },
-        ]
-      },
-      {
-        kind: 'category', name: '📝 문자열', colour: '#A5D6FF',
-        contents: [
-          { kind: 'block', type: 'text' },
-          { kind: 'block', type: 'text_join' },
-          { kind: 'block', type: 'text_length' },
-          { kind: 'block', type: 'text_isEmpty' },
-          { kind: 'block', type: 'text_indexOf' },
-          { kind: 'block', type: 'text_charAt' },
-          { kind: 'block', type: 'text_getSubstring' },
-          { kind: 'block', type: 'text_changeCase' },
-          { kind: 'block', type: 'text_trim' },
-        ]
-      },
-      {
-        kind: 'category', name: '🔀 조건', colour: '#FF7043',
-        contents: [
-          { kind: 'block', type: 'controls_if' },
-          { kind: 'block', type: 'controls_ifelse' },
-          { kind: 'block', type: 'logic_compare' },
-          { kind: 'block', type: 'logic_operation' },
-          { kind: 'block', type: 'logic_negate' },
-          { kind: 'block', type: 'logic_boolean' },
-        ]
-      },
-      {
-        kind: 'category', name: '🔁 반복', colour: '#7E57C2',
-        contents: [
-          { kind: 'block', type: 'controls_repeat_ext',
-            inputs: { TIMES: { shadow: { type: 'math_number', fields: { NUM: 5 } } } } },
-          { kind: 'block', type: 'controls_whileUntil' },
-          { kind: 'block', type: 'controls_for' },
-          { kind: 'block', type: 'controls_forEach' },
-          { kind: 'block', type: 'controls_flow_statements' },
-        ]
-      },
-      {
-        kind: 'category', name: '📋 리스트', colour: '#66BB6A',
-        contents: [
-          { kind: 'block', type: 'lists_create_empty' },
-          { kind: 'block', type: 'lists_create_with' },
-          { kind: 'block', type: 'lists_repeat' },
-          { kind: 'block', type: 'lists_length' },
-          { kind: 'block', type: 'lists_isEmpty' },
-          { kind: 'block', type: 'lists_indexOf' },
-          { kind: 'block', type: 'lists_getIndex' },
-          { kind: 'block', type: 'lists_setIndex' },
-          { kind: 'block', type: 'lists_getSublist' },
-          { kind: 'block', type: 'lists_sort' },
-        ]
-      },
-      {
-        kind: 'category', name: '🔧 함수', colour: '#9C27B0',
-        contents: [
-          { kind: 'block', type: 'procedures_defnoreturn' },
-          { kind: 'block', type: 'procedures_defreturn' },
-          { kind: 'block', type: 'procedures_callnoreturn' },
-          { kind: 'block', type: 'procedures_callreturn' },
-        ],
-        custom: 'PROCEDURE'
-      },
-    ]
-  };
-
-  function initBlockly() {
-    if (typeof Blockly === 'undefined') return;
-    const div = document.getElementById('blockly-div');
-    if (!div) return;
-    blocklyWorkspace = Blockly.inject('blockly-div', {
-      toolbox: BLOCKLY_TOOLBOX,
-      theme: {
-        base: Blockly.Themes.Dark,
-        componentStyles: {
-          workspaceBackgroundColour: '#0D1117',
-          toolboxBackgroundColour: '#1A1A2E',
-          toolboxForegroundColour: '#E6EDF3',
-          flyoutBackgroundColour: '#16213E',
-          flyoutForegroundColour: '#E6EDF3',
-          scrollbarColour: '#4FC3F7',
-        }
-      },
-      renderer: 'zelos',
-      zoom: { controls: true, wheel: true, startScale: 0.85 },
-      trashcan: true,
-      scrollbars: true,
-      grid: { spacing: 20, length: 3, colour: 'rgba(255,255,255,.05)', snap: true },
-    });
-    // 변경 시 자동 미리보기
-    blocklyWorkspace.addChangeListener(() => {
-      if (typeof Blockly.Python !== 'undefined') {
-        try {
-          const code = Blockly.Python.workspaceToCode(blocklyWorkspace);
-          const preview = document.getElementById('blockly-python-preview');
-          const codeEl  = document.getElementById('blockly-python-code');
-          if (code.trim()) {
-            if (preview) preview.style.display = 'block';
-            if (codeEl)  codeEl.textContent = code;
-          } else {
-            if (preview) preview.style.display = 'none';
-          }
-        } catch(e) {}
-      }
-    });
-  }
-
-  function blocklyToPython() {
-    if (!blocklyWorkspace || typeof Blockly === 'undefined') {
-      showToast('⚠️ Blockly를 불러오는 중이에요. 잠시 후 시도해주세요!'); return;
-    }
-    try {
-      const code = Blockly.Python.workspaceToCode(blocklyWorkspace);
-      if (!code.trim()) { showToast('⚠️ 블록을 먼저 추가해주세요!'); return; }
-      const preview = document.getElementById('blockly-python-preview');
-      const codeEl  = document.getElementById('blockly-python-code');
-      if (preview) preview.style.display = 'block';
-      if (codeEl)  codeEl.textContent = code;
-      showToast('✅ 파이썬 코드로 변환됐어요!');
-    } catch(e) {
-      showToast('⚠️ 변환 중 오류가 발생했어요.');
-    }
-  }
-
-  function applyBlocklyCode() {
-    const codeEl = document.getElementById('blockly-python-code');
-    if (!codeEl) return;
-    const code = codeEl.textContent;
-    document.getElementById('code-editor').value = code;
-    updateHighlight();
-    // 파이썬 탭으로 전환
-    switchEditorMode('code', document.getElementById('tab-code'));
-    showToast('✅ 파이썬 에디터에 적용됐어요!');
-  }
-
-  function clearBlockly() {
-    if (blocklyWorkspace) {
-      blocklyWorkspace.clear();
-      const preview = document.getElementById('blockly-python-preview');
-      if (preview) preview.style.display = 'none';
-      showToast('🗑 블록이 초기화됐어요!');
-    }
-  }
 </script>
 </body>
 </html>
