@@ -1820,7 +1820,7 @@ print(result4)  # 결과: False</textarea>
       /* ───── 문제 04 그룹 ───── */
       { no:13, title:'[04] 공배수 판별', diff:'medium',
         desc:'<b>🏆 COS Pro 3급</b><br><br>정수 a, b, c가 주어졌을 때, c가 a와 b의 공배수면 True, 아니면 False를 출력하세요.<br><br><b>예시:</b> 3, 5, 15 → True / 3, 5, 33 → False',
-        starter:'# 3은 3과 같다 \'그리고\' 2는 1보다 크다\nprint(3 == 3 ??? 2 > 1)  # 결과: True\n\n# 5는 10보다 크다 \'또는\' 7은 7과 같다\ncondition1 = (5 > 10)    # False\ncondition2 = (7 == 7)    # True\nresult2 = condition1 ??? condition2\nprint(result2)  # 결과: True\n\n# 3. False의 \'반대\'는?\ncondition3 = False\nresult3 = ??? condition3\nprint(result3)  # 결과: True\n\n# 4. True의 \'반대\'는?\ncondition4 = True\nresult4 = ??? condition4\nprint(result4)  # 결과: False',
+        starter:'a = int(input())\nb = int(input())\nc = int(input())\nif _________:  # 밑줄을 삭제하고 코드 작성하세요\n    print("True")\nelse:\n    print("False")',
         answer_keys:['if c % a == 0 and c % b == 0'],
         alt_answer_sets:[
           ['c%a==0','c%b==0'],
@@ -2683,7 +2683,7 @@ print(result4)`;
     if (!p) return false;
 
     // 1) 빈칸(_____) 또는 ???가 남아있으면 무조건 오답
-    if (code.includes('_____') || code.includes('???') || code.includes('______')) return false;
+    if (/_{5,}/.test(code) || code.includes('???') || code.includes('______')) return false;
 
     const normCode = normalizeCode(code);
 
