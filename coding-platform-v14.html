@@ -3263,6 +3263,7 @@ print(result4)`;
     closeProblemModal();
     renderTeacherProblems();
     renderSidebar();
+    saveChapters(); // Supabase에 저장
   }
 
   // ══ 클래스 관리 ══
@@ -4088,9 +4089,16 @@ print(result4)`;
       await Promise.all([
         saveStudentProgress(),
         saveSubmissionLog(),
-        saveStudents()
+        saveStudents(),
+        saveChapters()
       ]);
     }, 800);
+  }
+
+  async function saveChapters() {
+    try {
+      await sbUpsert('cs_chapters', { id: 'main', data: JSON.stringify(CHAPTERS) });
+    } catch(e) {}
   }
 
   // ── 로드 함수들 ──
@@ -4120,6 +4128,18 @@ print(result4)`;
       const dbLog = await sbGet('cs_submission_log', 'id=eq.global');
       if (dbLog && dbLog.length > 0) {
         submissionLog = JSON.parse(dbLog[0].log || '[]');
+      }
+
+      // 문제 데이터 로드 (선생님이 수정한 내용 반영)
+      const dbChapters = await sbGet('cs_chapters', 'id=eq.main');
+      if (dbChapters && dbChapters.length > 0 && dbChapters[0].data) {
+        try {
+          const loaded = JSON.parse(dbChapters[0].data);
+          if (Array.isArray(loaded) && loaded.length > 0) {
+            CHAPTERS.length = 0;
+            loaded.forEach(ch => CHAPTERS.push(ch));
+          }
+        } catch(e) {}
       }
     } catch(e) {
       console.error('loadFromStorage error:', e);
